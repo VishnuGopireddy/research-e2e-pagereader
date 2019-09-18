@@ -213,9 +213,9 @@ def evaluate(
                     lab_str=labels_to_text(text_annots[assigned_annotation[0]].astype('int'),retinanet.module.alphabet)
                     if len(lab_str)>0:
                         cer=float(editdistance.eval(pred_str,lab_str)/len(lab_str))
-
+                    else:
+                        cer=1.
                     cers.append(cer)
-                    print("CER",cer)
                     detected_annotations.append(assigned_annotation)
                 else:
                     false_positives = np.append(false_positives, 1)
@@ -246,6 +246,12 @@ def evaluate(
     for label in range(generator.num_classes()):
         label_name = generator.label_to_name(label)
         print('{}: {}'.format(label_name, average_precisions[label][0]))
+
+    mAPs=[]
+    for k,v in average_precisions.items():
+        mAPs.append(v[0])
+    mAP=np.mean(mAPs)
     print("Per box CER",np.mean(cers)) 
-    return average_precisions
+    cer = np.mean(cers)
+    return mAP,np.mean(cers)
 

@@ -66,7 +66,7 @@ def roi_pooling(input, rois, size=(100,30), spatial_scale=1.0):
         real_width = int((roi[2]-roi[0]).cpu())
         real_height = max(int((roi[3]-roi[1]).cpu()),1)
     
-        scale_h = float(size[1])/real_height
+        scale_h = 10*float(size[1])/real_height
         no_padded_w = int(math.ceil(real_width*scale_h))
         # Add padding or cut roi
         if no_padded_w<1: 

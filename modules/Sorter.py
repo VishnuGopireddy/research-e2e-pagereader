@@ -4,7 +4,7 @@ import torch.nn as nn
 class RoISorter(nn.Module):
     # Module to sort detected Regions of Interest by reading order (left-right,top-bottom)
     def __init__(self):
-        super(SortRois,self).__init__()
+        super(RoISorter,self).__init__()
     
     def forward(self,rois):
         pxml = pagexml.PageXML()

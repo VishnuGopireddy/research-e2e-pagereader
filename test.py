@@ -146,11 +146,8 @@ def main(args=None):
 
         print('Evaluating dataset')
     '''
-    mAP = csv_eval.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
-    aps = []
-    for k,v in mAP.items():
-        aps.append(v[0])
-    print ("VALID mAP:",np.mean(aps))
+    mAP,cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
+    print ("VALID mAP:",mAP)
             
     print("score th",retinanet.module.score_threshold)
     for idx,data in enumerate(dataloader_box_annot):

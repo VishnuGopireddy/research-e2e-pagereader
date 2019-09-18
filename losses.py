@@ -27,7 +27,7 @@ def calc_iou(a, b):
 class FocalLoss(nn.Module):
     #def __init__(self):
 
-    def forward(self, classifications, regressions, anchors, annotations,criterion,transcription,selected_indices,probs_sizes,pool_w,htr_gt_box):
+    def forward(self, classifications, regressions, anchors, annotations,criterion,transcription,selected_indices,probs_sizes,pool_w,htr_gt_box,binary_classifier):
         alpha = 0.25
         gamma = 2.0
         #alphabet_len = 27
@@ -72,8 +72,8 @@ class FocalLoss(nn.Module):
             num_positive_anchors = positive_indices.sum()
 
             assigned_annotations = bbox_annotation[IoU_argmax, :].clone()
-            
-            assigned_annotations[...,4]=0 # consider all objects as text objects instead of different named entity classes
+            if binary_classifier: 
+                assigned_annotations[...,4]=0 # consider all objects as text objects instead of different named entity classes
 
             targets[positive_indices, :] = 0
             targets[positive_indices, assigned_annotations[positive_indices, 4].long()] = 1
@@ -159,7 +159,6 @@ class NERLoss(nn.Module):
         IoU_max, IoU_argmax = torch.max(IoU, dim=1) # num_anchors x 1
 
 
-        total_ctc_loss=0
         if htr_gt_box:
             all_transcript_labels=bbox_annotation[:,5:(5+max_label_len)].int().cpu()
         else:
@@ -172,8 +171,6 @@ class NERLoss(nn.Module):
         box_transcript.requires_grad_(True)
         probs_size = torch.tensor([probs_sizes]).view(1,1).int()
         #print transcript_labels-1,probs_size
-
-        ctc_loss = criterion(box_transcript,transcript_labels,probs_size,label_lengths)
 
         ner_pred = box_transcript.squeeze()
         ner_label = transcript_labels.view(transcript_labels.numel(),1)-1
@@ -228,7 +225,6 @@ class TranscriptionLoss(nn.Module):
             #alphabet ="!&'()*+,-./0123456789:;?ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz "
             #gt_string = [alphabet[c-1] for c in transcript_labels]
             #print (gt_string)
-            #pdb.set_trace()
             ctc_loss = criterion(box_transcript,transcript_labels,probs_size,label_lengths)
             del box_transcript
             ctc_loss = ctc_loss.float()

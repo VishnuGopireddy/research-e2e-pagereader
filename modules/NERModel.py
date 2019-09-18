@@ -3,10 +3,9 @@ import torch.nn as nn
 class NERModel(nn.Module):
     # Module to calculate character probabilities for roi-pool output feature map
 
-    def __init__(self,feature_size = 256,pool_h=32,n_classes=4):
+    def __init__(self,feature_size = 256,pool_h=32,n_classes=4,pool_w=280):
         super(NERModel,self).__init__()
         self.n_classes=n_classes
-        pool_w=280
 
         nh= 256
         self.conv1 = nn.Conv2d(feature_size, nh, kernel_size=3, padding=1)

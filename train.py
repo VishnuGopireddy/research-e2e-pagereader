@@ -59,7 +59,9 @@ def main(args=None):
     parser.add_argument('--max_iters_epoch', help='Max steps per epoch (for debugging)',default=1000000)
     parser.add_argument('--train_htr',help='Train recognition or not',default='True')
     parser.add_argument('--train_det',help='Train detection or not',default='True')
+    parser.add_argument('--binary_classifier',help='Wether to use classification branch as binary or not, multiclass instead.',default='False')
     parser.add_argument('--htr_gt_box',help='Train recognition branch with box gt (for debugging)',default='False')
+    parser.add_argument('--ner_branch',help='Train named entity recognition with separate branch',default='False')
     
     parser = parser.parse_args(args)
 
@@ -84,10 +86,13 @@ def main(args=None):
     # Files for training log
 
     experiment_id =str(time.time()).split('.')[0]
-    valid_cer_f=open(experiment_id+'_valid_CER.txt','w')
+    valid_cer_f=open('trained_models/'+parser.model_out+'log.txt','w')
     for arg in vars(parser):
         if getattr(parser, arg) is not None:
             valid_cer_f.write(str(arg)+' '+str(getattr(parser, arg))+'\n')
+        
+    valid_cer_f.write( "epoch_num   cer     best cer     mAP    best mAP     time\n")
+
     valid_cer_f.close()
 
 
@@ -106,6 +111,8 @@ def main(args=None):
     
     train_htr = parser.train_htr=='True'
     htr_gt_box = parser.htr_gt_box=='True'
+    ner_branch = parser.ner_branch=='True'
+    binary_classifier = parser.binary_classifier=='True'
     torch.backends.cudnn.benchmark= False 
     
 
@@ -122,7 +129,9 @@ def main(args=None):
                     seg_level=parser.seg_level,
                     alphabet=alphabet,
                     train_htr=train_htr,
-                    htr_gt_box=htr_gt_box)
+                    htr_gt_box=htr_gt_box,
+                    ner_branch=ner_branch,
+                    binary_classifier=binary_classifier)
 
         elif parser.depth == 34:
 
@@ -206,7 +215,7 @@ def main(args=None):
                         loss = ctc_loss+ classification_loss+regression_loss+ner_loss
 
                     else:
-                        loss = classification_loss+regression_loss
+                        loss = classification_loss+regression_loss+ner_loss
                         
                 elif train_htr:
                     loss = ctc_loss
@@ -219,13 +228,13 @@ def main(args=None):
                 torch.nn.utils.clip_grad_norm_(retinanet.parameters(), 0.1)
                 if iter_num % verbose_each==0:
                     print(('Epoch: {} | Step: {} |Classification loss: {:1.5f} | Regression loss: {:1.5f} | CTC loss: {:1.5f} | NER loss: {:1.5f} | Running loss: {:1.5f} | Total loss: {:1.5f}\r'.format(epoch_num,iter_num, float(classification_loss), float(regression_loss),float(ctc_loss),float(ner_loss),np.mean(loss_hist),float(loss),"\r")))
-                torch.cuda.empty_cache() 
 
                 optimizer.step()
 
                 loss_hist.append(float(loss))
 
                 epoch_loss.append(float(loss))
+                torch.cuda.empty_cache() 
 
                 
             except Exception as e:
@@ -235,40 +244,39 @@ def main(args=None):
 
             print('Evaluating dataset')
 
-            mAP = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
-            mAP=float(mAP[0][0])        
-
+            mAP,current_cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
         retinanet.eval()
         retinanet.training=False    
         retinanet.score_threshold = float(parser.score_threshold) 
-        for idx,data in enumerate(dataloader_val):
+        '''for idx,data in enumerate(dataloader_val):
             if idx>int(parser.max_iters_epoch): break
             print("Eval CER on validation set:",idx,"/",len(dataset_val),"\r")
             image_name = dataset_val.image_names[idx].split('/')[-1].split('.')[-2]
 
             #generate_pagexml(image_name,data,retinanet,parser.score_threshold,parser.nms_threshold,dataset_val)
-            text_gt = dataset_val.image_names[idx].split('.')[0]+'.txt'
+            text_gt =".".join(dataset_val.image_names[idx].split('.')[:-1])+'.txt'
             f =open(text_gt,'r')
             text_gt_lines=f.readlines()[0]
             transcript_pred = get_transcript(image_name,data,retinanet,float(parser.score_threshold),float(parser.nms_threshold),dataset_val,alphabet)
-            cers.append(float(editdistance.eval(transcript_pred,text_gt_lines))/len(text_gt_lines))
+            cers.append(float(editdistance.eval(transcript_pred,text_gt_lines))/len(text_gt_lines))'''
 
         t=str(time.time()).split('.')[0]
 
-        valid_cer_f=open(experiment_id+'_valid_CER.txt','a')
-        valid_cer_f.write(str(epoch_num)+" "+str(np.mean(cers))+" "+t+'\n')
         valid_cer_f.close()
-        print("GT",text_gt_lines)
-        print("PREDS SAMPLE:",transcript_pred)
+        #print("GT",text_gt_lines)
+        #print("PREDS SAMPLE:",transcript_pred)
         
 
         if parser.early_stop_crit=='cer':
 
-            if float(np.mean(cers))<float(best_cer): 
-                best_cer=np.mean(cers)
+            if float(current_cer)<float(best_cer): 
+                best_cer=current_cer
                 epochs_no_improvement=0
                 torch.save(retinanet.module, 'trained_models/'+parser.model_out+'{}_retinanet.pt'.format(parser.dataset))
+
             else: epochs_no_improvement+=1
+            if mAP>best_map:
+                best_map=mAP    
         elif parser.early_stop_crit=='map':
             if mAP>best_map:
                 best_map=mAP    
@@ -276,11 +284,15 @@ def main(args=None):
                 torch.save(retinanet.module, 'trained_models/'+parser.model_out+'{}_retinanet.pt'.format(parser.dataset))
         
             else: epochs_no_improvement+=1
+            if float(current_cer)<float(best_cer): 
+                best_cer=current_cer
         if train_det:
             print(epoch_num,"mAP: ",mAP," best mAP",best_map)
         if train_htr:
-            print("VALID CER:",np.mean(cers),"best CER",best_cer)    
+            print("VALID CER:",current_cer,"best CER",best_cer)    
         print("Epochs no improvement:",epochs_no_improvement)
+        valid_cer_f=open('trained_models/'+parser.model_out+'log.txt','a')
+        valid_cer_f.write(str(epoch_num)+" "+str(current_cer)+" "+str(best_cer)+' '+str(mAP)+' '+str(best_map)+' '+t+'\n')
         if epochs_no_improvement>3:
             for param_group in optimizer.param_groups:
                 if param_group['lr']>10e-5:

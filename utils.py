@@ -6,6 +6,7 @@ import torch.nn as nn
 import numpy as np
 import sys
 import itertools
+import csv
 
 def labels_to_text(labels,alphabet):
     ret = []
@@ -24,13 +25,14 @@ def get_transcript_txt(csv_file):
     reader = csv.reader(csv_file,delimiter=',')
     gt_files = {}
     for annot in reader:
-            gt_txt_file = annot[0].split('.')[0]+'.txt'
-            if gt_files.get(gt_txt_file) is not None:
-                    gt_files[gt_txt_file].append(annot[-1])
+        gt_txt_file = ".".join(annot[0].split('.')[0:-1])+'.txt'
+        print (gt_txt_file)
+        if gt_files.get(gt_txt_file) is not None:
+            gt_files[gt_txt_file].append(annot[-1])
 
-            else: gt_files[gt_txt_file]=[annot[-1]]
+        else: gt_files[gt_txt_file]=[annot[-1]]
 	
-    for k,v in gt_files.iteritems():
+    for k,v in gt_files.items():
             f=open(k,'w')
             f.write(" ".join(v))
             f.close()

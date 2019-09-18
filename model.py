@@ -14,6 +14,7 @@ from modules.PyramidFeatures import PyramidFeatures
 from modules.BoxSampler import BoxSampler
 from modules.RecognitionModel import RecognitionModel
 from modules.NERModel import NERModel
+from modules.Sorter import RoISorter
 import losses
 from modules.RoIPooling import roi_pooling, adaptive_max_pool,AdaptiveMaxPool2d
 import cv2
@@ -31,33 +32,13 @@ model_urls = {
 }
 
 
-class BidirectionalLSTM(nn.Module):
-    # Module to extract BLSTM features from convolutional feature map
-
-    def __init__(self, nIn, nHidden, nOut):
-        super(BidirectionalLSTM, self).__init__()
-
-        self.rnn = nn.LSTM(nIn, nHidden, bidirectional=True)
-        self.embedding = nn.Linear(nHidden * 2, nOut)
-        self.rnn.cuda()
-        self.embedding.cuda()
-
-    def forward(self, input):
-        recurrent, _ = self.rnn(input)
-        T, b, h = recurrent.size()
-        t_rec = recurrent.view(T * b, h)
-
-        output = self.embedding(t_rec)  # [T * b, nOut]
-        output = output.view(T, b, -1)
-
-        return output
 
 class ResNet(nn.Module):
 
-    def __init__(self, num_classes, block, layers,max_boxes,score_threshold,seg_level,alphabet,train_htr,htr_gt_box,two_step=False):
+    def __init__(self, num_classes, block, layers,max_boxes,score_threshold,seg_level,alphabet,train_htr,htr_gt_box,ner_branch=False,binary_classifier=True):
         self.inplanes = 64
-        self.pool_h = 4
-        self.pool_w = 280
+        self.pool_h = 2
+        self.pool_w = 400
         self.forward_transcription=False
         self.max_boxes = max_boxes
         super(ResNet, self).__init__()
@@ -74,8 +55,10 @@ class ResNet(nn.Module):
         self.score_threshold = score_threshold
         self.alphabet=alphabet
         self.train_htr=train_htr
+        self.binary_classifier=binary_classifier
         self.htr_gt_box =htr_gt_box
-        self.two_step = two_step
+        self.num_classes = num_classes
+        self.ner_branch = ner_branch
 
         if block == BasicBlock:
             fpn_sizes = [self.layer2[layers[1]-1].conv2.out_channels, self.layer3[layers[2]-1].conv2.out_channels, self.layer4[layers[3]-1].conv2.out_channels]
@@ -87,16 +70,18 @@ class ResNet(nn.Module):
         self.anchors = Anchors(seg_level=seg_level)
         self.regressionModel = RegressionModel(num_features_in=256,num_anchors=self.anchors.num_anchors)
         self.recognitionModel = RecognitionModel(feature_size=256,pool_h=self.pool_h,alphabet_len=len(alphabet))
-        self.nerModel = NERModel(feature_size=256,pool_h=self.pool_h,n_classes=num_classes)
+        if ner_branch:
+            self.nerModel = NERModel(feature_size=256,pool_h=self.pool_h,n_classes=num_classes,pool_w=self.pool_w)
         self.classificationModel = ClassificationModel(num_features_in=256,num_anchors=self.anchors.num_anchors, num_classes=num_classes)
         self.boxSampler = BoxSampler('train',self.score_threshold)
-        #self.sorter = SortRois()
+        self.sorter = RoISorter()
         self.regressBoxes = BBoxTransform()
 
         self.clipBoxes = ClipBoxes()
         
-        self.focalLoss = losses.FocalLoss()    
-        self.nerLoss = losses.NERLoss()
+        self.focalLoss = losses.FocalLoss()   
+        if ner_branch:
+            self.nerLoss = losses.NERLoss()
         self.transcriptionLoss = losses.TranscriptionLoss() 
   
         for m in self.modules():
@@ -119,7 +104,10 @@ class ResNet(nn.Module):
         self.recognitionModel.output.weight.data.fill_(0)
 
         self.recognitionModel.output.bias.data.fill_(-math.log((1.0-prior)/prior))
-        
+        if ner_branch:
+            self.nerModel.output.weight.data.fill_(0)
+
+            self.nerModel.output.bias.data.fill_(-math.log((1.0-prior)/prior))
         self.freeze_bn()
 
     def _make_layer(self, block, planes, blocks, stride=1):
@@ -175,7 +163,13 @@ class ResNet(nn.Module):
             scores,classes,transformed_anchors,selected_indices = self.boxSampler(img_batch,anchors,regression,classification,self.score_threshold)
             rois = transformed_anchors.clone()
         n_boxes_predicted=transformed_anchors.shape[0]
-        
+        order = self.sorter(transformed_anchors)
+        selected_indices =torch.tensor([selected_indices[o] for o in order])
+        rois  = torch.stack([rois[o,...] for o in order])
+        transformed_anchors  = torch.stack([transformed_anchors[o,...] for o in order])
+        scores  = torch.stack([scores[o,...] for o in order])
+        classes = torch.stack([classes[o,...] for o in order])
+
         # Only calculate the recognition branch forward if there's a limited amount of positive rois and after a predifined
         # amount of epochs only trained with detection (it works with 0 epochs only detection)    
 
@@ -188,17 +182,11 @@ class ResNet(nn.Module):
             
             feature = features[0]
             downsampling_factor=self.downsampling_factors[0]
-            
             # calculate pooled features and transcritpion for each box:
             for j in range(rois.shape[0]):
                 pooled_feature,probs_size = roi_pooling(feature,rois[j,:4],size = (self.pool_w,self.pool_h),spatial_scale=1./downsampling_factor)
-                '''roi=rois[j,:4].clone()
-                roi=roi.view(1,1,4,1)
-                roi=roi.repeat(1,256,1,1)'''
-
                 transcription = self.recognitionModel(pooled_feature)
                 transcriptions.append(transcription)
-                #pooled_feature=torch.cat([pooled_feature,roi],dim=3)
                 pooled_features.append(pooled_feature)
                 probs_sizes.append(probs_size[0])
 
@@ -208,7 +196,8 @@ class ResNet(nn.Module):
             pooled_features= torch.stack(pooled_features,dim=0).squeeze()
 
             transcription = torch.stack(transcriptions,dim=0).squeeze()    
-            ner_tags = self.nerModel(pooled_features)
+            if self.ner_branch:
+                ner_tags = self.nerModel(pooled_features)
         else:
             self.forward_transcription=False
             transcription = torch.zeros((transformed_anchors.shape[0],1,1))
@@ -216,26 +205,36 @@ class ResNet(nn.Module):
             probs_sizes=[]
             
         if self.training:
-            focal_loss= self.focalLoss(classification, regression, anchors, annotations,criterion,transcription,selected_indices,probs_sizes,self.pool_w,self.htr_gt_box)
+            focal_loss= self.focalLoss(classification, regression, anchors, annotations,criterion,transcription,selected_indices,probs_sizes,self.pool_w,self.htr_gt_box,self.binary_classifier)
             if self.forward_transcription:
                 ctc_loss=self.transcriptionLoss(classification, regression, anchors, annotations,criterion,transcription,selected_indices,probs_sizes,self.pool_w,self.htr_gt_box)
-                ner_loss = self.nerLoss(classification, regression, anchors, annotations,criterion,ner_tags,selected_indices,n_boxes_predicted,self.pool_w,self.htr_gt_box)
+                if self.ner_branch:
+                    ner_loss = self.nerLoss(classification, regression, anchors, annotations,criterion,ner_tags,selected_indices,n_boxes_predicted,self.pool_w,self.htr_gt_box)
+                else:
+                    ner_loss=torch.tensor(0.).cuda()
 
             else:
                 ctc_loss=torch.tensor(30.).cuda()
-                ner_loss=torch.tensor(30.).cuda()
+                ner_loss=torch.tensor(0.).cuda()
             return focal_loss[0],focal_loss[1],ctc_loss,ner_loss
             
         else:
+
+
+
+
             if self.htr_gt_box:
                 scores = torch.ones((annotations.shape[1],1))
                 classes = torch.zeros((annotations.shape[1],1))
                 return [scores,classes,annotations[0,:,:4],transcription]
 
-            #return [scores,classes,transformed_anchors,transcription]
-            ner_tags=torch.argmax(ner_tags,dim=-1)[:n_boxes_predicted,...]
-            ner_tags = ner_tags.view(ner_tags.numel())
-            return [scores,ner_tags,transformed_anchors,transcription]
+            if self.ner_branch:
+                ner_tags=torch.argmax(ner_tags,dim=-1)[:n_boxes_predicted,...]
+                ner_tags = ner_tags.view(ner_tags.numel())
+                return [scores,ner_tags,transformed_anchors,transcription]
+            
+            else:
+                return [scores,classes,transformed_anchors,transcription]
 
 
 
