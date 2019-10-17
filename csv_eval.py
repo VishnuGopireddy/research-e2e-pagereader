@@ -188,8 +188,8 @@ def evaluate(
         for i in range(len(generator)):
             detections           = all_detections[i][label]
             annotations          = all_annotations[i][label]
-            text_dets =              all_text_preds[i][label]
-            text_annots = all_text_annots[i][label]
+            text_dets =              all_text_preds.get(i,default={}).get(label,default={})
+            text_annots = all_text_annots.get(i,{}).get(label,{})
             num_annotations     += annotations.shape[0]
             detected_annotations = []
             for j in range(len(detections)):
