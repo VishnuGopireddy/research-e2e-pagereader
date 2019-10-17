@@ -4,6 +4,9 @@ import torch
 import torch.nn as nn
 import sys
 
+line_ratios=[0.1,0.15, 0.25,0.3]
+word_ratios = [0.5,1,2]
+
 class Anchors(nn.Module):
     def __init__(self, pyramid_levels=None, strides=None, sizes=None, ratios=None, scales=None,seg_level='word'):
         super(Anchors, self).__init__()
@@ -16,10 +19,10 @@ class Anchors(nn.Module):
         if ratios is None:
             #self.ratios = np.array([0.8, 0.1, 0.12])
             if seg_level=='line':
-                self.ratios = np.array([0.1,0.15, 0.25,0.3])
+                self.ratios = np.array(line_ratios)
         
             elif seg_level=='word':
-                self.ratios = np.array([0.5,1,2])
+                self.ratios = np.array(word_ratios)
             else:
                 print ("Choose seg_level [word,line]")
                 sys.exit()
@@ -54,10 +57,10 @@ def generate_anchors(base_size=16, ratios=None, scales=None):
 
     if ratios is None:
         if seg_level=='line':
-            self.ratios = np.array([0.1,0.15, 0.25,0.3])
+            self.ratios = np.array(line_ratios)
         
         elif seg_level=='word':
-                    self.ratios = np.array([0.5,1,2])
+                    self.ratios = np.array(word_ratios)
         else:
             print ("Choose seg_level [word,line]")
             sys.exit()
