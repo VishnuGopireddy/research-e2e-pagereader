@@ -25,7 +25,6 @@ for line_idx in range(len(flines)):
     if im_file != prev_im:
         if line_idx>0:
             cv2.imwrite(gt_im_path,im)
-            pdb.set_trace()
         im = cv2.imread(im_file)
 
     cv2.rectangle(im,(x0,y0),(x1,y1),(0,0,0))
