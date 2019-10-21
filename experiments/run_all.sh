@@ -1,6 +1,9 @@
 #!/bin/bash
+./experiments/set_path.sh
 
-names=( "FUNSD" "data-esposalles" "handwritten_synthetic" )
+names=( "data-esposalles" "handwritten_synthetic" "FUNSD" )
+
+./experiments/run_its.sh 
 
 for i in "${names[@]}"
 do 
