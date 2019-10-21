@@ -23,7 +23,9 @@ import losses
 from dataloader import CSVDataset, collater, Resizer, AspectRatioBasedSampler, Augmenter, UnNormalizer, Normalizer
 from torch.utils.data import Dataset, DataLoader
 
+import csv_eval_binary_map 
 import csv_eval
+
 from get_transcript import get_transcript
 
 from warpctc_pytorch import CTCLoss
@@ -53,6 +55,7 @@ def main(args=None):
     parser.add_argument('--max_boxes', help='Max boxes to be fed to recognition',default=50)
     parser.add_argument('--seg_level', help='Line or word, to choose anchor aspect ratio',default='line')
     parser.add_argument('--htr_gt_box',help='Train recognition branch with box gt (for debugging)',default=False)
+    parser.add_argument('--binary_classifier',help='Wether to use classification branch as binary or not, multiclass instead.',default='False')
     parser = parser.parse_args(args)
     
     # Create the data loaders
@@ -100,18 +103,8 @@ def main(args=None):
     if os.path.exists(parser.model):
         retinanet = torch.load(parser.model)
     else:
-        if parser.depth == 18:
-            retinanet = model.resnet18(num_classes=dataset_val.num_classes(), pretrained=True,max_boxes=int(parser.max_boxes),score_threshold=float(parser.score_threshold),seg_level=parser.seg_level,alphabet=alphabet)
-        elif parser.depth == 34:
-            retinanet = model.resnet34(num_classes=dataset_train.num_classes(), pretrained=True)
-        elif parser.depth == 50:
-            retinanet = model.resnet50(num_classes=dataset_train.num_classes(), pretrained=True)
-        elif parser.depth == 101:
-            retinanet = model.resnet101(num_classes=dataset_train.num_classes(), pretrained=True)
-        elif parser.depth == 152:
-            retinanet = model.resnet152(num_classes=dataset_train.num_classes(), pretrained=True)
-        else:
-            raise ValueError('Unsupported model depth, must be one of 18, 34, 50, 101, 152')        
+        print("Choose an existing saved model path.")
+        sys.exit()
     use_gpu = True
 
     if use_gpu:
@@ -147,28 +140,10 @@ def main(args=None):
         print('Evaluating dataset')
     '''
     mAP,cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
-    print ("VALID mAP:",mAP)
-            
-    print("score th",retinanet.module.score_threshold)
-    for idx,data in enumerate(dataloader_box_annot):
-        print("Eval CER on validation set:",idx,"/",len(dataloader_box_annot),"\r")
-        if box_annot_data:
-            image_name = box_annot_data.image_names[idx].split('/')[-1].split('.')[-2]
-        else:    
-            image_name = dataset_val.image_names[idx].split('/')[-1].split('.')[-2]
-        #generate_pagexml(image_name,data,retinanet,parser.score_threshold,parser.nms_threshold,dataset_val)
-        text_gt_path="/".join(dataset_val.image_names[idx].split('/')[:-1])
-        text_gt = os.path.join(text_gt_path,image_name+'.txt')
-        f =open(text_gt,'r')
-        text_gt_lines=f.readlines()[0]
-        transcript_pred = get_transcript(image_name,data,retinanet,retinanet.module.score_threshold,float(parser.nms_threshold),dataset_val,alphabet)
-        cers.append(float(editdistance.eval(transcript_pred,text_gt_lines))/len(text_gt_lines))
-        print("GT",text_gt_lines)
-        print("PREDS SAMPLE:",transcript_pred)
-        print("VALID CER:",np.mean(cers),"best CER",best_cer)    
-    print("GT",text_gt_lines)
-    print("PREDS SAMPLE:",transcript_pred)
-    print("VALID CER:",np.mean(cers),"best CER",best_cer)    
+    print ("VALID NER mAP:",mAP)
+
+    det_map,cer= csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
+    print ("VALID text det mAP:",det_map)
 
 if __name__ == '__main__':
  main()
