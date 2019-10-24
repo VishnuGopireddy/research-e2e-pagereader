@@ -1,4 +1,5 @@
 import torch.nn as nn
+#from BidirectionalLSTM import BidirectionalLSTM
 
 class NERModel(nn.Module):
     # Module to calculate character probabilities for roi-pool output feature map
