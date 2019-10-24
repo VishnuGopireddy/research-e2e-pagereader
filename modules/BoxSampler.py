@@ -45,8 +45,10 @@ class BoxSampler(nn.Module):
             transformed_anchors  = transformed_anchors[0,anchors_nms_idx,:]
             
             classification = classification[:, scores_over_thresh, :]
-            nms_scores, classes = classification[0, anchors_nms_idx, :].max(dim=1)
-
+            if classification[0,anchors_nms_idx,:].numel()>0:
+                nms_scores, classes = classification[0, anchors_nms_idx, :].max(dim=1)
+            else:
+                return torch.zeros(1, 1),torch.zeros(1, 1),torch.zeros(1, 4),torch.zeros(1)
             selected_indices = scores_over_thresh_idx[anchors_nms_idx]
             selected_indices = selected_indices.view(selected_indices.numel())
             return nms_scores,classes,transformed_anchors,selected_indices
