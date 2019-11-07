@@ -25,6 +25,7 @@ from dataloader import CSVDataset, collater, Resizer, AspectRatioBasedSampler, A
 from torch.utils.data import Dataset, DataLoader
 
 import csv_eval
+import csv_eval_binary_map
 from get_transcript import get_transcript
 
 from warpctc_pytorch import CTCLoss
@@ -183,7 +184,7 @@ def main(args=None):
     best_cer = 1000
     best_map = 0
     epochs_no_improvement=0
-    verbose_each=1
+    verbose_each=20
     optimize_each =1
     print(('Num training images: {}'.format(len(dataset_train))))
 
@@ -245,6 +246,8 @@ def main(args=None):
             print('Evaluating dataset')
 
             mAP,current_cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
+            text_mAP,_ = csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
+
         retinanet.eval()
         retinanet.training=False    
         retinanet.score_threshold = float(parser.score_threshold) 
@@ -292,7 +295,7 @@ def main(args=None):
             print("VALID CER:",current_cer,"best CER",best_cer)    
         print("Epochs no improvement:",epochs_no_improvement)
         valid_cer_f=open('trained_models/'+parser.model_out+'log.txt','a')
-        valid_cer_f.write(str(epoch_num)+" "+str(current_cer)+" "+str(best_cer)+' '+str(mAP)+' '+str(best_map)+' '+t+'\n')
+        valid_cer_f.write(str(epoch_num)+" "+str(current_cer)+" "+str(best_cer)+' '+str(mAP)+' '+str(best_map)+' '+str(text_mAP)+'\n')
         if epochs_no_improvement>3:
             for param_group in optimizer.param_groups:
                 if param_group['lr']>10e-5:
