@@ -186,6 +186,9 @@ def main(args=None):
     epochs_no_improvement=0
     verbose_each=20
     optimize_each =1
+    objective = 100
+    best_objective = 10000
+
     print(('Num training images: {}'.format(len(dataset_train))))
 
     
@@ -247,6 +250,7 @@ def main(args=None):
 
             mAP,current_cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
             text_mAP,_ = csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
+            objective = current_cer*(1-mAP)
 
         retinanet.eval()
         retinanet.training=False    
@@ -272,8 +276,10 @@ def main(args=None):
 
         if parser.early_stop_crit=='cer':
 
-            if float(current_cer)<float(best_cer): 
+            if float(objective)<float(best_objective):#float(current_cer)<float(best_cer): 
                 best_cer=current_cer
+                best_objective = objective
+                
                 epochs_no_improvement=0
                 torch.save(retinanet.module, 'trained_models/'+parser.model_out+'{}_retinanet.pt'.format(parser.dataset))
 
