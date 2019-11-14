@@ -6,6 +6,7 @@ import argparse
 import pdb
 import collections
 import sys
+import subprocess
 
 import numpy as np
 
@@ -91,6 +92,9 @@ def main(args=None):
     for arg in vars(parser):
         if getattr(parser, arg) is not None:
             valid_cer_f.write(str(arg)+' '+str(getattr(parser, arg))+'\n')
+    
+    current_commit = subprocess.check_output(['git','rev-parse','HEAD'])
+    valid_cer_f.write(current_commit)
         
     valid_cer_f.write( "epoch_num   cer     best cer     mAP    best mAP     time\n")
 

@@ -197,7 +197,7 @@ def evaluate(
                 detections           = all_detections[i][label]
                 annotations          = all_annotations[i][label]
 
-            text_dets =              all_text_preds[i][label]
+            text_dets = {}    #         all_text_preds[i][label]
             text_annots = all_text_annots[i][label]
             num_annotations     += annotations.shape[0]
             detected_annotations = []
