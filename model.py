@@ -185,7 +185,10 @@ class ResNet(nn.Module):
             # calculate pooled features and transcritpion for each box:
             for j in range(rois.shape[0]):
                 pooled_feature,probs_size = roi_pooling(feature,rois[j,:4],size = (self.pool_w,self.pool_h),spatial_scale=1./downsampling_factor)
-                transcription = self.recognitionModel(pooled_feature)
+                if pooled_feature.shape[1]>1:
+                    transcription = self.recognitionModel(pooled_feature)
+                else:
+                    transcription = torch.zeros((1,1,1))
                 transcriptions.append(transcription)
                 pooled_features.append(pooled_feature)
                 probs_sizes.append(probs_size[0])
