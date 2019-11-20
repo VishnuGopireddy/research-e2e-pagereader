@@ -86,6 +86,7 @@ def _get_detections(dataset, retinanet, score_threshold=0.05, max_detections=100
             scale = data['scale']
             # run network
             scores, labels, boxes,transcriptions = retinanet(data['img'].permute(2, 0, 1).cuda().float().unsqueeze(dim=0))
+
             scores = scores.cpu().numpy()
             labels = labels.cpu().numpy()
             boxes  = boxes.cpu().numpy()
@@ -152,44 +153,31 @@ def _get_annotations(generator):
 
     return all_annotations,all_transcriptions
 
-
-def evaluate(
-    generator,
-    retinanet,
-    iou_threshold=0.5,
-    score_threshold=0.05,
-    max_detections=400,
-    save_path=None
-):
-    """ Evaluate a given dataset using a given retinanet.
-    # Arguments
-        generator       : The generator that represents the dataset to evaluate.
-        retinanet           : The retinanet to evaluate.
-        iou_threshold   : The threshold used to consider when a detection is positive or negative.
-        score_threshold : The score confidence threshold to use for detections.
-        max_detections  : The maximum number of detections to use per image.
-        save_path       : The path to save images with visualized detections to.
-    # Returns
-        A dict mapping class names to mAP scores.
-    """
-
-
-    # gather all detections and annotations
-    all_detections,all_text_preds     = _get_detections(generator, retinanet, score_threshold=score_threshold, max_detections=max_detections, save_path=save_path)
-    all_annotations,all_text_annots    = _get_annotations(generator)
+def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet,iou_threshold=0.5,score_threshold=0.05,max_detections=400,save_path=None):
     average_precisions = {}
     cers=[]
-    for label in range(generator.num_classes()):
+    if binary:
+        n_classes = 1
+    else:
+        n_classes = generator.num_classes()
+    for label in range(n_classes):#generator.num_classes()):
         false_positives = np.zeros((0,))
         true_positives  = np.zeros((0,))
         scores          = np.zeros((0,))
         num_annotations = 0.0
 
         for i in range(len(generator)):
-            detections           = all_detections[i][label]
-            annotations          = all_annotations[i][label]
-            text_dets =              all_text_preds.get(i,{}).get(label,{})
-            text_annots = all_text_annots.get(i,{}).get(label,{})
+            if binary:
+                detections           = np.concatenate(all_detections[i][:])#all_detections[i][label]
+                annotations          = np.concatenate(all_annotations[i][:])#label]
+                text_dets = np.concatenate([all_text_preds[i][lab] for lab in range(generator.num_classes())])
+                text_annots = np.concatenate([all_text_annots[i][lab] for lab in range(generator.num_classes())])
+            else:
+                detections           = all_detections[i][label]
+                annotations          = all_annotations[i][label]
+                text_dets =              all_text_preds[i][label]
+                text_annots = all_text_annots[i][label]
+
             num_annotations     += annotations.shape[0]
             detected_annotations = []
             for j in range(len(detections)):
@@ -209,13 +197,18 @@ def evaluate(
                 if max_overlap >= iou_threshold and assigned_annotation not in detected_annotations:
                     false_positives = np.append(false_positives, 0)
                     true_positives  = np.append(true_positives, 1)
-                    pred_str=labels_to_text(text_dets[j].astype('int'),retinanet.module.alphabet)
-                    lab_str=labels_to_text(text_annots[assigned_annotation[0]].astype('int'),retinanet.module.alphabet)
+                    if retinanet.module.binary_classifier:
+                        pred_str=labels_to_text(text_dets[j].astype('int'),retinanet.module.alphabet)
+                        lab_str=labels_to_text(text_annots[assigned_annotation[0]].astype('int'),retinanet.module.alphabet)
+                    else:
+                        pred_str=labels_to_text(text_dets[j].astype('int'),retinanet.module.alphabet)
+                        lab_str=labels_to_text(text_annots[assigned_annotation[0]].astype('int'),retinanet.module.alphabet)
                     if len(lab_str)>0:
                         cer=float(editdistance.eval(pred_str,lab_str)/len(lab_str))
                     else:
                         cer=1.
                     cers.append(cer)
+
                     detected_annotations.append(assigned_annotation)
                 else:
                     false_positives = np.append(false_positives, 1)
@@ -241,17 +234,57 @@ def evaluate(
         # compute average precision
         average_precision  = _compute_ap(recall, precision)
         average_precisions[label] = average_precision, num_annotations
-    
-    print('\nmAP:')
-    for label in range(generator.num_classes()):
-        label_name = generator.label_to_name(label)
-        print('{}: {}'.format(label_name, average_precisions[label][0]))
+        
+    if binary:#retinanet.module.binary_classifier:
+        for label in range(1):#generator.num_classes()):
+            label_name = 'Text'#generator.label_to_name(label)
+            print('{}: {}'.format(label_name, average_precisions[label][0]))
+
+    else:
+        for label in range(generator.num_classes()):
+            label_name = generator.label_to_name(label)
+            print('{}: {}'.format(label_name, average_precisions[label][0]))
 
     mAPs=[]
     for k,v in average_precisions.items():
         mAPs.append(v[0])
     mAP=np.mean(mAPs)
+    print('mAP',mAP)
     print("Per box CER",np.mean(cers)) 
     cer = np.mean(cers)
     return mAP,np.mean(cers)
+
+
+def evaluate(
+    generator,
+    retinanet,
+    iou_threshold=0.5,
+    score_threshold=0.05,
+    max_detections=400,
+    save_path=None
+):
+    """ Evaluate a given dataset using a given retinanet.
+    # Arguments
+        generator       : The generator that represents the dataset to evaluate.
+        retinanet           : The retinanet to evaluate.
+        iou_threshold   : The threshold used to consider when a detection is positive or negative.
+        score_threshold : The score confidence threshold to use for detections.
+        max_detections  : The maximum number of detections to use per image.
+        save_path       : The path to save images with visualized detections to.
+    # Returns
+        A dict mapping class names to mAP scores.
+    """
+
+
+    # gather all detections and annotations
+    all_detections,all_text_preds     = _get_detections(generator, retinanet, score_threshold=score_threshold, max_detections=max_detections, save_path=save_path)
+    all_annotations,all_text_annots    = _get_annotations(generator)
+    binary=False
+    print('NER recognition')
+    mAP,cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
+    binary=True
+    print('Text recognition')
+    mAP,cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
+    return mAP,cer
+
 
