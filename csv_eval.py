@@ -284,7 +284,7 @@ def evaluate(
     mAP,cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
     binary=True
     print('Text recognition')
-    mAP,cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
-    return mAP,cer
+    binary_mAP,binary_cer = calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,binary,generator,retinanet)
+    return mAP,binary_mAP,binary_cer
 
 

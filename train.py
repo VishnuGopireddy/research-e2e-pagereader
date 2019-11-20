@@ -252,8 +252,8 @@ def main(args=None):
 
             print('Evaluating dataset')
 
-            mAP,current_cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
-            text_mAP,_ = csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
+            mAP,text_mAP,current_cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
+            #text_mAP,_ = csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=parser.score_threshold)
             objective = current_cer*(1-mAP)
 
         retinanet.eval()
