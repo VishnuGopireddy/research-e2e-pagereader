@@ -140,10 +140,9 @@ def main(args=None):
         print('Evaluating dataset')
     '''
     mAP,cer = csv_eval.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
-    print ("VALID NER mAP:",mAP)
 
-    det_map,cer= csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
-    print ("VALID text det mAP:",det_map)
+    #det_map,cer= csv_eval_binary_map.evaluate(dataset_val, retinanet,score_threshold=retinanet.module.score_threshold)
+    #print ("VALID text det mAP:",det_map)
 
 if __name__ == '__main__':
  main()
