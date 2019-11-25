@@ -29,5 +29,7 @@ t = np.arange(0., 5., 0.2)
 
 # red dashes, blue squares and green triangles
 plt.plot(epochs,det_maps, 'r',epochs,cers, 'b', epochs,ner_maps, 'g')
+plt.ylabel('mAP / 1-CER')
+plt.xlabel('epochs')
 plt.show()
 
