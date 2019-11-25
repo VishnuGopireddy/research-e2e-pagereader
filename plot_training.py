@@ -28,8 +28,11 @@ epochs = np.array(epochs)[:45]
 t = np.arange(0., 5., 0.2)
 
 # red dashes, blue squares and green triangles
-plt.plot(epochs,det_maps, 'r',epochs,cers, 'b', epochs,ner_maps, 'g')
-plt.ylabel('mAP / 1-CER')
-plt.xlabel('epochs')
-plt.show()
-
+plt.plot(epochs,det_maps, 'r',label='det mAP')
+plt.plot(epochs,cers, 'b',label='HTR 1-CER')
+plt.plot(epochs,ner_maps, 'g',label='NER mAP')
+#plt.ylabel('mAP / 1-CER')
+#plt.xlabel('epochs')
+plt.legend()
+#plt.show()
+plt.savefig(dataset+'_train_log.png')
