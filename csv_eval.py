@@ -170,12 +170,12 @@ def calculate_map(all_detections,all_text_preds,all_annotations,all_text_annots,
             if binary:
                 detections           = np.concatenate(all_detections[i][:])#all_detections[i][label]
                 annotations          = np.concatenate(all_annotations[i][:])#label]
-                text_dets = np.concatenate([all_text_preds[i][lab] for lab in range(generator.num_classes())])
-                text_annots = np.concatenate([all_text_annots[i][lab] for lab in range(generator.num_classes())])
+                text_dets = np.concatenate([all_text_preds.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())])
+                text_annots = np.concatenate([all_text_annots.get(i,{}).get(lab,{}) for lab in range(generator.num_classes())])
             else:
                 detections           = all_detections[i][label]
                 annotations          = all_annotations[i][label]
-                text_dets =              all_text_preds[i][label]
+                text_dets =              all_text_preds.get(i,{}).get(label,torch.zeros(1))
                 text_annots = all_text_annots[i][label]
 
             num_annotations     += annotations.shape[0]
