@@ -1,6 +1,9 @@
-# pytorch End-to-End Page Reader
+# End-to-End Handwritten Text Detection and Transcription in Full Pages
 
-Code for the papers [End-To-End Handwritten Text Detection and Transcription in Full Pages](http://www.cvc.uab.es/people/mcarbonell/papers/wml.pdf) and  [TreyNet: A Neural Model for Text Localization, Transcription and Named EntityRecognition in Full Pages](https://arxiv.org/pdf/1912.10016.pdf).
+![img3](http://www.cvc.uab.es/people/mcarbonell/images/page.jpg)
+
+Pytorch  implementation of the paper [End-To-End Handwritten Text Detection and Transcription in Full Pages](http://www.cvc.uab.es/people/mcarbonell/papers/wml.pdf) by Manuel Carbonell, Joan Mas, Mauricio Villegas, Alicia Fornés and Josep Lladós.
+
 
 ## Installation
 
@@ -13,7 +16,7 @@ apt-get install tk-dev python-tk
 ```
 
 3) Install the python packages:
-
+    
 ```
 pip3 install cffi
 
@@ -29,74 +32,20 @@ Warp ctc pytorch: https://github.com/SeanNaren/warp-ctc
 
 Python pagexml: https://github.com/omni-us/pagexml/tree/master/py-pagexml
 
-## Detection and transcription on IAM:
-
-### Prepare data
-Download and extract IAM images and ground truth. You first need to register to the IAM database and set the environment variables for its credentials.
-
+## Data
+Train, validation and test examples's ground truth boxes and text contents must be listed in a csv file with the following format:
 ```
-cd datasets/iam
-
-IAM_U=[your IAMDB user]
-IAM_PW=[your IAMDB password]
-
-wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsA-D.tgz --user $IAM_U --password $IAM_PW
-wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsE-H.tgz --user $IAM_U --password $IAM_PW
-wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/forms/formsI-Z.tgz --user $IAM_U --password $IAM_PW
-
-mkdir forms
-
-tar -C forms -zxvf formsA-D.tgz
-tar -C forms -zxvf formsE-H.tgz
-tar -C forms -zxvf formsI-Z.tgz
-
-wget http://www.fki.inf.unibe.ch/DBs/iamDB/data/ascii/words.txt --user $IAM_U --password $IAM_PW
-```
-Get Aachen train, valid and test partitions
-```
-wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/tr.lst
-
-wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/te.lst
-
-wget https://raw.githubusercontent.com/jpuigcerver/PyLaia/refactor_kws_egs_master/egs/iam-htr/data/part/forms/aachen/va.lst
-
-python generate_gt_IAM_csv.py words.txt
-
-cd ../..
+path/to/image1.png,text_bbox_1_x0,text_bbox_1_y0,text_bbox_1_x1,text_bbox_1_y1,'text',text_bbox_1_content
+path/to/image1.png,text_bbox_2_x0,text_bbox_2_y0,text_bbox_2_x1,text_bbox_2_y1,'text',text_bbox_2_content
+...
+path/to/imageN.png,text_bbox_1_x0,text_bbox_1_y0,text_bbox_1_x1,text_bbox_1_y1,'text',text_bbox_1_content
 
 ```
 
-
-### Training, testing and predictions visualization
+## Training
 
 
 ```
-./experiments/set_path.sh
-
-./train_e2e.sh
-
-./test_e2e.sh
-
-./predict_e2e.sh
-
+./experiment_e2e.sh
 ```
 
-## Detection, transcription and named entity recognition on IEHHR:
-
-
-### Prepare data
-Download and extract IEHHR images and ground truth from https://rrc.cvc.uab.es/?ch=10&com=downloads.
-
-Convert pagexml ground truth to csv to be read by the dataloader.
-```
-python3 pagexml2csv.py --pxml_dir datasets/esposalles/train --fout datasets/esposalles/train.csv --classes_out classes.csv --get_property True --seg_lev TextLine
-python3 pagexml2csv.py --pxml_dir datasets/esposalles/valid --fout datasets/esposalles/valid.csv --classes_out classes.csv --get_property True --seg_lev TextLine
-python3 pagexml2csv.py --pxml_dir datasets/esposalles/test --fout datasets/esposalles/test.csv --classes_out classes.csv --get_property True --seg_lev TextLine
-
-```
-
-Run experiment
-```
-./experiments/run.sh esposalles
-
-```
