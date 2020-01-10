@@ -1,5 +1,5 @@
 import torch.nn as nn
-
+from BidirectionalLSTM import BidirectionalLSTM
 class RecognitionModel(nn.Module):
     # Module to calculate character probabilities for roi-pool output feature map
 
@@ -13,9 +13,9 @@ class RecognitionModel(nn.Module):
         self.conv2 = nn.Conv2d(nh, nh, kernel_size=3, padding=1)
         self.act2 = nn.ReLU()
         
-        '''self.rnn = nn.Sequential(
+        self.rnn = nn.Sequential(
         BidirectionalLSTM(pool_h*nh, nh,nh),
-        BidirectionalLSTM(nh,nh, pool_h*nh))'''
+        BidirectionalLSTM(nh,nh, pool_h*nh))
 
         self.output = nn.Linear(in_features=nh*pool_h,out_features=self.alphabet_len)
         
