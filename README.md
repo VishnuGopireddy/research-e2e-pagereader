@@ -81,6 +81,15 @@ cd ../..
 
 ```
 
+### Alternatively trained model can be downloaded
+
+```
+mkdir trained_models
+wget  -O trained_models/iam_join_det_htr_csv_retinanet.pt https://github.com/manucarbonell/models/blob/master/research-e2e-pagereader/iam_join_det_htr_lstm_csv_retinanet.pt?raw=true
+
+./predict_e2e.sh
+
+```
 ## Detection, transcription and named entity recognition on IEHHR:
 
 
