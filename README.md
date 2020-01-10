@@ -71,10 +71,32 @@ cd ../..
 
 
 ```
+./experiments/set_path.sh
+
 ./train_e2e.sh
 
 ./test_e2e.sh
 
 ./predict_e2e.sh
+
+```
+
+## Detection, transcription and named entity recognition on IEHHR:
+
+
+### Prepare data
+Download and extract IEHHR images and ground truth from https://rrc.cvc.uab.es/?ch=10&com=downloads.
+
+Convert pagexml ground truth to csv to be read by the dataloader.
+```
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/train --fout datasets/esposalles/train.csv --classes_out classes.csv --get_property True --seg_lev TextLine
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/valid --fout datasets/esposalles/valid.csv --classes_out classes.csv --get_property True --seg_lev TextLine
+python3 pagexml2csv.py --pxml_dir datasets/esposalles/test --fout datasets/esposalles/test.csv --classes_out classes.csv --get_property True --seg_lev TextLine
+
+```
+
+Run experiment
+```
+./experiments/run.sh esposalles
 
 ```
