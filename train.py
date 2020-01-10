@@ -28,6 +28,7 @@ from torch.utils.data import Dataset, DataLoader
 import csv_eval
 import csv_eval_binary_map
 from get_transcript import get_transcript
+from modules.ClassificationModel import ClassificationModel
 
 from warpctc_pytorch import CTCLoss
 #from torch_baidu_ctc import CTCLoss
@@ -123,7 +124,10 @@ def main(args=None):
 
     alphabet=dataset_train.alphabet
     if os.path.exists(parser.pretrained_model):
-            retinanet = torch.load(parser.pretrained_model)
+        retinanet = torch.load(parser.pretrained_model)
+        retinanet.classificationModel = ClassificationModel(num_features_in=256,num_anchors=retinanet.anchors.num_anchors, num_classes=dataset_train.num_classes())
+        if ner_branch:
+            retinanet.nerModel = NERModel(feature_size=256,pool_h=retinanet.pool_h,n_classes=dataset_train.num_classes(),pool_w=retinanet.pool_w)
     else:
         if parser.depth == 18:
             retinanet = model.resnet18(
@@ -196,8 +200,6 @@ def main(args=None):
     print(('Num training images: {}'.format(len(dataset_train))))
 
     
-
-
     for epoch_num in range(parser.epochs):
         cers=[]
 
