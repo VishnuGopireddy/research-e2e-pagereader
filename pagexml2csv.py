@@ -49,7 +49,7 @@ def main(args=None):
     parser.add_argument('--classes_out', help='Path to save text category classes.')
     parser.add_argument('--seg_lev',help='segmentation level of the boxes to get (Word/TextLine)',default ="Word")
     parser.add_argument('--get_property',help='segmentation level of the boxes to get (Word/TextLine)',default =False)
-    parser.add_argument('--property_key',help='key to get property from pagexml',default ='label')
+    parser.add_argument('--property_key',help='key to get property from pagexml',default ='category')
     
     parser = parser.parse_args(args)
     pagexml.set_omnius_schema()
@@ -72,18 +72,20 @@ def main(args=None):
                 regions = pxml.select('_:TextRegion',page)
                 for region in regions:
                     reg_tag=pxml.getPropertyValue(region,key=parser.property_key)
-                    for textObject in pxml.select('_:'+parser.seg_lev,region):
-                        x0,y0,x1,y1,transcription,tag=get_coords_and_transcript(pxml,textObject,parser.property_key)
-                        if tag not in all_tags: all_tags.append(tag)
-                        if x0>=x1 or y0>=y1: continue
-                        if parser.get_property:
-                            if len(tag)>0:
-                                writer.writerow([page_im_file,x0,y0,x1,y1,tag,transcription])
-                            else:
+                    for textLine in pxml.select('_:TextLine',region):
+                        for word in pxml.select('_:Word',textLine):
+                            x0,y0,x1,y1,transcription,tag=get_coords_and_transcript(pxml,word,parser.property_key)
+                            if tag not in all_tags: all_tags.append(tag)
+                            if x0>=x1 or y0>=y1: continue
+                            if parser.get_property:
 
-                                writer.writerow([page_im_file,x0,y0,x1,y1,reg_tag,transcription])
-                        else:
-                                writer.writerow([page_im_file,x0,y0,x1,y1,'text',transcription])
+                                if len(tag)>0:
+                                    writer.writerow([page_im_file,x0,y0,x1,y1,tag,transcription])
+                                else:
+
+                                    writer.writerow([page_im_file,x0,y0,x1,y1,reg_tag,transcription])
+                            else:
+                                    writer.writerow([page_im_file,x0,y0,x1,y1,'text',transcription])
 
 
     if len(all_tags)>0:
